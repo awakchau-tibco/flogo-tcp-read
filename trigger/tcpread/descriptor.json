@@ -1,0 +1,128 @@
+{
+  "name": "flogo-tcp-read-trigger",
+  "version": "0.1.1",
+  "title": "TCP Read Trigger",
+  "type": "flogo:trigger",
+  "description": "Read messages from TCP",
+  "author": "awakchau@tibco.com",
+  "ref": "github.com/awakchau-tibco/flogo-tcp-read/trigger/tcpread",
+  "homepage": "https://github.com/awakchau-tibco/flogo-tcp-read/tree/master/trigger/tcpread",
+  "settings": [
+    {
+      "name": "network",
+      "type": "string",
+      "required": false,
+      "allowed": [
+        "tcp",
+        "tcp4",
+        "tcp6",
+        "udp",
+        "udp4",
+        "udp6",
+        "ip",
+        "ip4",
+        "ip6",
+        "unix",
+        "unixgram",
+        "unixpacket"
+      ],
+      "description": "Type of the network. Supported types are: tcp, tcp4 (IPv4-only), tcp6 (IPv6-only), udp, udp4 (IPv4-only), udp6 (IPv6-only), ip, ip4 (IPv4-only), ip6 (IPv6-only), unix, unixgram and unixpacket. Default is tcp",
+      "display": {
+        "name": "Network Type",
+        "description": "Type of the network. Supported types are: tcp, tcp4 (IPv4-only), tcp6 (IPv6-only), udp, udp4 (IPv4-only), udp6 (IPv6-only), ip, ip4 (IPv4-only), ip6 (IPv6-only), unix, unixgram and unixpacket. Default is tcp",
+        "type": "dropdown",
+        "selection": "single",
+        "visible": true
+      },
+      "value": "tcp"
+    },
+    {
+      "name": "host",
+      "type": "string",
+      "required": false,
+      "description": "Domain name or IP address of the host. Default is localhost",
+      "display": {
+        "name": "Host",
+        "description": "Domain name or IP address of the host. Default is localhost",
+        "type": "string",
+        "visible": true,
+        "appPropertySupport": true,
+        "mappable": true
+      },
+      "value": "127.0.0.1"
+    },
+    {
+      "name": "port",
+      "type": "string",
+      "required": true,
+      "description": "Literal port number or a service name like http, domain etc",
+      "display": {
+        "name": "Port",
+        "description": "Literal port number or a service name like http, domain etc",
+        "type": "string",
+        "visible": true,
+        "appPropertySupport": true,
+        "mappable": true
+      }
+    },
+    {
+      "name": "delimiter",
+      "type": "string",
+      "required": false,
+      "description": "If not set, trigger will read data stream until EOF",
+      "display": {
+        "name": "Delimiter",
+        "description": "If not set, trigger will read data stream until EOF",
+        "type": "string",
+        "visible": true,
+        "appPropertySupport": true,
+        "mappable": true
+      },
+      "allowed": ["Carriage Return (CR)", "Line Feed (LF)", "Form Feed (FF)"]
+    },
+    {
+      "name": "customDelimiter",
+      "type": "string",
+      "required": false,
+      "description": "If set, this will override the above Delimiter",
+      "display": {
+        "name": "Custom Delimiter",
+        "description": "If set, this will override the above Delimiter",
+        "type": "string",
+        "visible": true,
+        "appPropertySupport": true,
+        "mappable": true
+      }
+    },
+    {
+      "name": "timeoutMs",
+      "type": "number",
+      "required": false,
+      "value": 0,
+      "description": "Timeout for TCP read operation in milliseconds. Default is 0 (no timeout)",
+      "display": {
+        "name": "Timeout (in millis)",
+        "description": "Timeout for TCP read operation in milliseconds. Default is 0 (no timeout)",
+        "type": "number",
+        "visible": true
+      }
+    }
+  ],
+  "output": [
+    {
+      "name": "data",
+      "type": "string",
+      "description": "Received data"
+    }
+  ],
+  "reply": [
+    {
+      "name": "reply",
+      "type": "string",
+      "description": "Reply data"
+    }
+  ],
+  "handler": {
+    "settings": []
+  }
+}
