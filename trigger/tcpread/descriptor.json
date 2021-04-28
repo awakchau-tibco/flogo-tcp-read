@@ -1,6 +1,6 @@
 {
   "name": "flogo-tcp-read-trigger",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "title": "TCP Read Trigger",
   "type": "flogo:trigger",
   "description": "Read messages from TCP",
@@ -84,10 +84,10 @@
       "name": "customDelimiter",
       "type": "string",
       "required": false,
-      "description": "If set, this will override the above Delimiter",
+      "description": "Hex code for delimiter character. If set, this will override the above Delimiter",
       "display": {
         "name": "Custom Delimiter",
-        "description": "If set, this will override the above Delimiter",
+        "description": "Hex code for delimiter character. If set, this will override the above Delimiter",
         "type": "string",
         "visible": true,
         "appPropertySupport": true,

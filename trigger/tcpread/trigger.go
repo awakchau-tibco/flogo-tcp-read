@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"io"
 	"net"
@@ -17,6 +18,7 @@ import (
 )
 
 var triggerMd = trigger.NewMetadata(&Settings{}, &HandlerSettings{}, &Output{}, &Reply{})
+var logger log.Logger
 
 func init() {
 	_ = trigger.Register(&Trigger{}, &Factory{})
@@ -57,9 +59,12 @@ func (t *Trigger) Initialize(ctx trigger.InitContext) error {
 	host := t.settings.Host
 	port := t.settings.Port
 	t.handlers = ctx.GetHandlers()
-	t.logger = ctx.Logger()
-	t.setDelimiter()
-	t.logger.Debugf("Delimiter is set to bytes [%+v]", t.delimiter)
+	logger = ctx.Logger()
+	err := t.setDelimiter()
+	if err != nil {
+		return err
+	}
+	logger.Debugf("Delimiter is set to bytes [%+v]", t.delimiter)
 	if port == "" {
 		return errors.New("Valid port must be set")
 	}
@@ -71,11 +76,17 @@ func (t *Trigger) Initialize(ctx trigger.InitContext) error {
 	return err
 }
 
-func (t *Trigger) setDelimiter() {
+func (t *Trigger) setDelimiter() error {
 	if len(t.settings.CustomDelimiter) > 0 {
-		r, _ := utf8.DecodeRuneInString(t.settings.CustomDelimiter)
+		// Refer this for delimiter hex codes: http://www.columbia.edu/kermit/ascii.html
+		delimBytes, err := hex.DecodeString(t.settings.CustomDelimiter)
+		if err != nil {
+			return err
+		}
+		r, _ := utf8.DecodeRune(delimBytes)
 		t.delimiter = byte(r)
-		return
+		logger.Debugf("Custom delimiter is set to: Decimal [%[1]v] or Hex [%[1]x]", t.delimiter)
+		return nil
 	}
 	switch t.settings.Delimiter {
 	case "Carriage Return (CR)":
@@ -85,12 +96,14 @@ func (t *Trigger) setDelimiter() {
 	case "Form Feed (FF)":
 		t.delimiter = '\f'
 	}
+	logger.Debugf("Delimiter is set to: Decimal [%[1]v] or Hex [%[1]x]", t.delimiter)
+	return nil
 }
 
 // Start starts the kafka trigger
 func (t *Trigger) Start() error {
 	go t.waitForConnection()
-	t.logger.Infof("Started listener on Port: %s, Network: %s", t.settings.Port, t.settings.Network)
+	logger.Infof("Started listener on Port: %s, Network: %s", t.settings.Port, t.settings.Network)
 	return nil
 }
 
@@ -101,14 +114,13 @@ func (t *Trigger) waitForConnection() {
 		if err != nil {
 			errString := err.Error()
 			if !strings.Contains(errString, "use of closed network connection") {
-				t.logger.Error("Error accepting connection: ", err.Error())
+				logger.Error("Error accepting connection: ", err.Error())
 			}
 			return
 		}
-		t.logger.Infof("Handling new connection from client: %s", conn.RemoteAddr().String())
+		logger.Infof("Handling new connection from client: %s", conn.RemoteAddr().String())
 		// Handle connections in a new goroutine.
 		go t.handleNewConnection(conn)
-
 	}
 }
 
@@ -116,22 +128,19 @@ func (t *Trigger) handleNewConnection(conn net.Conn) {
 	//Gather connection list for later cleanup
 	t.connections = append(t.connections, conn)
 	for {
-
 		if t.settings.TimeoutMs > 0 {
-			t.logger.Debug("Setting timeout: ", t.settings.TimeoutMs)
+			logger.Debug("Setting timeout: ", t.settings.TimeoutMs)
 			conn.SetDeadline(time.Now().Add(time.Duration(t.settings.TimeoutMs) * time.Millisecond))
 		}
-
 		output := &Output{}
-
 		if t.delimiter != 0 {
 			data, err := bufio.NewReader(conn).ReadBytes(t.delimiter)
 			if err != nil {
 				errString := err.Error()
 				if !strings.Contains(errString, "use of closed network connection") {
-					t.logger.Error("Error reading data from connection: ", err.Error())
+					logger.Error("Error reading data from connection: ", err.Error())
 				} else {
-					t.logger.Info("Connection is closed.")
+					logger.Info("Connection is closed.")
 				}
 				if nerr, ok := err.(net.Error); !ok || !nerr.Timeout() {
 					// Return if not timeout error
@@ -147,9 +156,9 @@ func (t *Trigger) handleNewConnection(conn net.Conn) {
 			if err != nil {
 				errString := err.Error()
 				if !strings.Contains(errString, "use of closed network connection") {
-					t.logger.Error("Error reading data from connection: ", err.Error())
+					logger.Error("Error reading data from connection: ", err.Error())
 				} else {
-					t.logger.Info("Connection is closed.")
+					logger.Info("Connection is closed.")
 				}
 				if nerr, ok := err.(net.Error); !ok || !nerr.Timeout() {
 					// Return if not timeout error
@@ -165,14 +174,14 @@ func (t *Trigger) handleNewConnection(conn net.Conn) {
 			for i := 0; i < len(t.handlers); i++ {
 				results, err := t.handlers[i].Handle(context.Background(), output)
 				if err != nil {
-					t.logger.Error("Error invoking action : ", err.Error())
+					logger.Error("Error invoking action : ", err.Error())
 					continue
 				}
 
 				reply := &Reply{}
 				err = reply.FromMap(results)
 				if err != nil {
-					t.logger.Error("Failed to convert flow output : ", err.Error())
+					logger.Error("Failed to convert flow output : ", err.Error())
 					continue
 				}
 				if reply.Reply != "" {
@@ -185,7 +194,7 @@ func (t *Trigger) handleNewConnection(conn net.Conn) {
 				// Send a response back to client contacting us.
 				_, err := conn.Write([]byte(replyToSend + "\n"))
 				if err != nil {
-					t.logger.Error("Failed to write to connection : ", err.Error())
+					logger.Error("Failed to write to connection : ", err.Error())
 				}
 			}
 		}
@@ -194,18 +203,13 @@ func (t *Trigger) handleNewConnection(conn net.Conn) {
 
 // Stop implements ext.Trigger.Stop
 func (t *Trigger) Stop() error {
-
 	for i := 0; i < len(t.connections); i++ {
 		t.connections[i].Close()
 	}
-
 	t.connections = nil
-
 	if t.listener != nil {
 		t.listener.Close()
 	}
-
-	t.logger.Info("Stopped listener")
-
+	logger.Info("Stopped listener")
 	return nil
 }
